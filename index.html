@@ -547,6 +547,196 @@ class NeoPixel:
     def write(self):
         # BITSTREAM_TYPE_HIGH_LOW = 0
         bitstream(self.pin, 0, self.timing, self.buf)
+# ---------------- SNAKE GAME CLASS----------------
+class SnakeGame:
+    def __init__(self, oled, button_pin, cell_size=4):
+        self.oled = oled
+        self.button = Pin(button_pin, Pin.IN, Pin.PULL_UP)  # Initialize button in class
+        self.CELL = cell_size
+        self.WIDTH = 128
+        self.HEIGHT = 64
+        self.GRID_W = self.WIDTH // cell_size
+        self.GRID_H = self.HEIGHT // cell_size
+        self.UP    = (0, -1)
+        self.DOWN  = (0, 1)
+        self.LEFT  = (-1, 0)
+        self.RIGHT = (1, 0)
+        self.INITIAL_LENGTH = 4
+        self.INITIAL_SPEED = 200
+        self.alive = True  # Track if snake is alive
+
+    # ---------------- Button Wait ----------------
+    def wait_for_button(self):
+        """Wait for button press and release"""
+        while self.button.value() == 1:  # Wait for press (button goes low)
+            pass
+        while self.button.value() == 0:  # Wait for release (button goes high)
+            pass
+
+    def is_button_pressed(self):
+        """Check if button is currently pressed"""
+        return self.button.value() == 0
+
+    # ---------------- Screen Messages ----------------
+    def start_game_message(self):
+        # Show start screen with game title
+        self.oled.fill(0)  # Clear screen
+        self.oled.text("SNAKE GAME", 20, 10)
+        self.oled.text("Press Button", 15, 30)
+        self.oled.show()
+    
+    def game_over_message(self):
+        # Show game over screen with final score
+        self.oled.fill(0)  # Clear screen
+        self.oled.text("GAME OVER!", 20, 10)
+        self.oled.text("Score: " + str(self.score), 20, 30)
+        self.oled.text("Press Button", 10, 50)
+        self.oled.show()
+
+    def pause_message(self):
+        # Optional: Show pause screen
+        self.oled.fill(0)
+        self.oled.text("PAUSED", 45, 30)
+        self.oled.text("Press Button", 15, 50)
+        self.oled.show()
+
+    # ---------------- Utility ----------------
+    def clear(self):
+        # Clear the OLED screen
+        self.oled.fill(0)
+
+    def draw_cell(self, x, y):
+        # Draw a single cell (snake segment or food)
+        px = x * self.CELL
+        py = y * self.CELL
+        self.oled.fill_rect(px, py, self.CELL, self.CELL, 1)
+
+    # ---------------- Setup ----------------
+    def new_game(self):
+        # Initialize new game state
+        cx = self.GRID_W // 2
+        cy = self.GRID_H // 2       
+        self.snake = [(cx - i, cy) for i in range(self.INITIAL_LENGTH)]
+        self.direction = self.RIGHT
+        self.score = 0
+        self.speed = self.INITIAL_SPEED
+        self.last_move = ticks_ms()
+        self.food = self.place_food()
+        self.alive = True
+
+    # ---------------- Food ----------------
+    def place_food(self):
+        """
+        Place food at random position not occupied by snake and not under score text.
+        Score area is top-left: x from 0 to 50, y from 0 to 8 (text area)
+        """
+        # Define forbidden area for food (score text area)
+        SCORE_AREA_X_MAX = 50  # Score text takes about 50 pixels width
+        SCORE_AREA_Y_MAX = 8   # Text height is 8 pixels
+        SCORE_GRID_X_MAX = SCORE_AREA_X_MAX // self.CELL
+        SCORE_GRID_Y_MAX = SCORE_AREA_Y_MAX // self.CELL
+        
+        while True:
+            t = ticks_ms()
+            fx = (t // 9) % self.GRID_W
+            fy = (t // 7) % self.GRID_H
+            
+            # Check if food would be under score text area
+            if fx < SCORE_GRID_X_MAX and fy < SCORE_GRID_Y_MAX:
+                continue  # Food would be hidden under score, try again
+            
+            # Check if food is on snake
+            if (fx, fy) not in self.snake:
+                return (fx, fy)
+
+    # ---------------- Direction ----------------
+    def update_direction(self, new_dir):
+        # Update snake direction with collision prevention
+        opposite = {
+            self.UP: self.DOWN,
+            self.DOWN: self.UP,
+            self.LEFT: self.RIGHT,
+            self.RIGHT: self.LEFT
+        }
+
+        if new_dir and new_dir != opposite[self.direction]:
+            self.direction = new_dir
+
+    # ---------------- Game Logic ----------------
+    def is_snake_dead(self):
+        # Check if snake is dead
+        return not self.alive
+    
+    def check_collision_and_move(self):
+        """
+        Move snake and check for collisions.
+        Returns: True if snake is still alive, False if dead
+        """
+        if not self.alive:
+            return False
+            
+        now = ticks_ms()
+        if ticks_diff(now, self.last_move) < self.speed:
+            return True  # Still alive, not time to move yet
+
+        self.last_move = now
+        hx, hy = self.snake[0]
+        dx, dy = self.direction
+        new_head = (hx + dx, hy + dy)
+
+        # Check collision with walls
+        if new_head[0] < 0 or new_head[0] >= self.GRID_W:
+            self.alive = False
+            return False
+            
+        # Check collision with walls (Y axis)
+        if new_head[1] < 0 or new_head[1] >= self.GRID_H:
+            self.alive = False
+            return False
+            
+        # Check collision with self
+        if new_head in self.snake:
+            self.alive = False
+            return False
+
+        self.snake.insert(0, new_head)
+
+        # Check if food eaten
+        if new_head == self.food:
+            self.score += 1
+            self.food = self.place_food()
+            if self.speed > 60:
+                self.speed -= 5
+        else:
+            self.snake.pop()
+            
+        return True  # Snake is still alive
+
+    # ---------------- Draw ----------------
+    def draw(self):
+        # Draw game state on OLED
+        if not self.alive:
+            return
+            
+        self.clear()
+        # Draw snake
+        for sx, sy in self.snake:
+            self.draw_cell(sx, sy)
+        # Draw food
+        fx, fy = self.food
+        self.draw_cell(fx, fy)
+        # Draw score (using small font at top-left)
+        self.oled.text("Score: " + str(self.score), 0, 0)
+        self.oled.show()
+    
+    # ---------------- Optional: Additional Features ----------------
+    def get_score(self):
+        # Return current score
+        return self.score
+    
+    def is_game_active(self):
+        # Return True if game is still active
+        return self.alive                      
 
 </code></pre>
       </div>
