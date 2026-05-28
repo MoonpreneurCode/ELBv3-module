@@ -42,15 +42,12 @@
 
       <div class="codewrap">
         <pre id="code"><code>
-
-# ELB.py
-from micropython import const
 import framebuf
-from machine import Pin, PWM, Timer, bitstream
-import time
 import random
+from micropython import const
+from machine import Pin, PWM, Timer, bitstream
 from array import array
-from utime import ticks_us, ticks_diff
+from utime import ticks_us, ticks_diff, ticks_ms, sleep_ms
 
 # SSD1306 register definitions
 SET_CONTRAST        = const(0x81)
@@ -160,11 +157,10 @@ class SSD1306_SPI(SSD1306):
         self.dc = dc
         self.res = res
         self.cs = cs
-        import time
         self.res(1)
-        time.sleep_ms(1)
+        sleep_ms(1)
         self.res(0)
-        time.sleep_ms(10)
+        sleep_ms(10)
         self.res(1)
         super().__init__(width, height, external_vcc)
 
@@ -271,23 +267,23 @@ def beep(buzzer, distance):
     # Very close
     if distance < 5:
         buzzer.duty_u16(30000)
-        time.sleep(0.1)
+        sleep_ms(100)
         buzzer.duty_u16(0)
-        time.sleep(0.1)
+        sleep_ms(100)
 
     # Close
     elif distance < 10:
         buzzer.duty_u16(30000)
-        time.sleep(0.1)
+        sleep_ms(100)
         buzzer.duty_u16(0)
-        time.sleep(0.1)
+        sleep_ms(100)
 
     # Medium
     elif distance < 20:
         buzzer.duty_u16(30000)
-        time.sleep(0.3)
+        sleep_ms(300)
         buzzer.duty_u16(0)
-        time.sleep(0.3)
+        sleep_ms(300)
 
     # Safe
     else:
@@ -547,11 +543,12 @@ class NeoPixel:
     def write(self):
         # BITSTREAM_TYPE_HIGH_LOW = 0
         bitstream(self.pin, 0, self.timing, self.buf)
+ 
 # ---------------- SNAKE GAME CLASS----------------
 class SnakeGame:
-    def __init__(self, oled, button_pin, cell_size=4):
+    def __init__(self, oled, button, cell_size=4):
         self.oled = oled
-        self.button = Pin(button_pin, Pin.IN, Pin.PULL_UP)  # Initialize button in class
+        self.button = button  # Button pin object passed from main.py
         self.CELL = cell_size
         self.WIDTH = 128
         self.HEIGHT = 64
@@ -736,7 +733,8 @@ class SnakeGame:
     
     def is_game_active(self):
         # Return True if game is still active
-        return self.alive                      
+        return self.alive
+                     
 
 </code></pre>
       </div>
