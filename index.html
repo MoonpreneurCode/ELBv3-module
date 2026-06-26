@@ -42,16 +42,13 @@
 
       <div class="codewrap">
         <pre id="code"><code>
-
-
 # ELB.py
-from micropython import const
 import framebuf
-from machine import Pin, PWM, Timer, bitstream
-import time
 import random
+from micropython import const
+from machine import Pin, PWM, Timer, bitstream
 from array import array
-from utime import ticks_us, ticks_diff
+from utime import ticks_us, ticks_diff, ticks_ms, sleep_ms
 
 # SSD1306 register definitions
 SET_CONTRAST        = const(0x81)
@@ -161,11 +158,10 @@ class SSD1306_SPI(SSD1306):
         self.dc = dc
         self.res = res
         self.cs = cs
-        import time
         self.res(1)
-        time.sleep_ms(1)
+        sleep_ms(1)
         self.res(0)
-        time.sleep_ms(10)
+        sleep_ms(10)
         self.res(1)
         super().__init__(width, height, external_vcc)
 
@@ -190,7 +186,7 @@ class Servo:
     def __init__(self, pin, min_duty=1638, max_duty=7864):
         """
         Initialize servo on specified pin
-        Default duty cycles: 1638 (0Â°) and 7864 (180Â°) for 50Hz PWM
+        Default duty cycles: 1638 (0°) and 7864 (180°) for 50Hz PWM
         """
         self.pwm = PWM(Pin(pin))
         self.pwm.freq(50)  # Set frequency to 50 Hz
@@ -216,11 +212,11 @@ class Servo:
         self.pwm.duty_u16(duty)
    
     def min_position(self):
-        # Move servo to minimum position (0Â°)
+        # Move servo to minimum position (0°)
         self.set_angle(0)
   
     def max_position(self):
-        # Move servo to maximum position (180Â°)
+        # Move servo to maximum position (180°)
         self.set_angle(180)
    
     def deinit(self):
@@ -272,23 +268,23 @@ def beep(buzzer, distance):
     # Very close
     if distance < 5:
         buzzer.duty_u16(30000)
-        time.sleep(0.1)
+        sleep_ms(100)
         buzzer.duty_u16(0)
-        time.sleep(0.1)
+        sleep_ms(100)
 
     # Close
     elif distance < 10:
         buzzer.duty_u16(30000)
-        time.sleep(0.1)
+        sleep_ms(100)
         buzzer.duty_u16(0)
-        time.sleep(0.1)
+        sleep_ms(100)
 
     # Medium
     elif distance < 20:
         buzzer.duty_u16(30000)
-        time.sleep(0.3)
+        sleep_ms(300)
         buzzer.duty_u16(0)
-        time.sleep(0.3)
+        sleep_ms(300)
 
     # Safe
     else:
@@ -348,7 +344,7 @@ class GameScreen:
 
         return pipe_x, top_pipe_height, bottom_pipe_height
     
-# IR_RX â abstract base class
+# IR_RX — abstract base class
 class IR_RX:
     Timer_id = -1   # Software timer; override if needed
     # Result / error codes
@@ -397,14 +393,14 @@ class IR_RX:
         self._pin.irq(handler=None)
         self.tim.deinit()
 
-# NEC_ABC â NEC / Samsung protocol decoder
+# NEC_ABC — NEC / Samsung protocol decoder
 class NEC_ABC(IR_RX):
     def __init__(self, pin, extended, samsung, callback, *args):
         # Block lasts <= 80 ms (extended) and has 68 edges
         super().__init__(pin, 68, 80, callback, *args)
         self._extended = extended
         self._addr     = 0
-        self._leader   = 2500 if samsung else 4000   # Âµs threshold
+        self._leader   = 2500 if samsung else 4000   # µs threshold
 
     def decode(self, _):
         try:
@@ -455,7 +451,7 @@ class SAMSUNG(NEC_ABC):
     def __init__(self, pin, callback, *args):
         super().__init__(pin, True, True, callback, *args)
 
-# ir_receiver class â high-level wrapper
+# ir_receiver class — high-level wrapper
 class ir_receiver:
     def __init__(self, pin):
         self._code    = None
@@ -548,11 +544,12 @@ class NeoPixel:
     def write(self):
         # BITSTREAM_TYPE_HIGH_LOW = 0
         bitstream(self.pin, 0, self.timing, self.buf)
+ 
 # ---------------- SNAKE GAME CLASS----------------
 class SnakeGame:
-    def __init__(self, oled, button_pin, cell_size=4):
+    def __init__(self, oled, button, cell_size=4):
         self.oled = oled
-        self.button = Pin(button_pin, Pin.IN, Pin.PULL_UP)  # Initialize button in class
+        self.button = button  # Button pin object passed from main.py
         self.CELL = cell_size
         self.WIDTH = 128
         self.HEIGHT = 64
@@ -738,7 +735,6 @@ class SnakeGame:
     def is_game_active(self):
         # Return True if game is still active
         return self.alive
-
 </code></pre>
       </div>
     </div>
